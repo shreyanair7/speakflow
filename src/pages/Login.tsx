@@ -67,7 +67,7 @@ const Login = ({ setUserAuthenticated }: LoginProps) => {
       </div>
       
       <div className="text-center mb-8">
-        <h1 className="text-3xl font-bold gradient-text mb-2">SpeakClearly</h1>
+        <h1 className="text-3xl font-bold gradient-text mb-2">SpeakFlow</h1>
         <p className="text-muted-foreground">Improve your speaking skills with AI-powered coaching</p>
       </div>
       
