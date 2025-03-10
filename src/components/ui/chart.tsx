@@ -1,3 +1,4 @@
+
 import * as React from "react"
 import * as RechartsPrimitive from "recharts"
 
@@ -353,6 +354,223 @@ function getPayloadConfigFromPayload(
     : config[key as keyof typeof config]
 }
 
+// Now, let's add the specific chart components that are being imported in Analytics.tsx
+
+interface ChartProps {
+  data: any[];
+  categories: string[];
+  index: string;
+  colors?: string[];
+  valueFormatter?: (value: number) => string;
+  className?: string;
+}
+
+// Line Chart Component
+const LineChart: React.FC<ChartProps> = ({
+  data,
+  categories,
+  index,
+  colors = ["blue", "green", "red"],
+  valueFormatter = (value: number) => `${value}`,
+  className,
+}) => {
+  // Create config object for the chart
+  const chartConfig: ChartConfig = {};
+  categories.forEach((category, i) => {
+    chartConfig[category] = {
+      label: category.charAt(0).toUpperCase() + category.slice(1),
+      color: colors[i % colors.length],
+    };
+  });
+
+  return (
+    <ChartContainer className={className} config={chartConfig}>
+      <RechartsPrimitive.LineChart data={data}>
+        <RechartsPrimitive.CartesianGrid strokeDasharray="3 3" />
+        <RechartsPrimitive.XAxis dataKey={index} />
+        <RechartsPrimitive.YAxis tickFormatter={(value) => valueFormatter(value)} />
+        <ChartTooltip
+          content={
+            <ChartTooltipContent
+              formatter={(value: any) => valueFormatter(value)}
+            />
+          }
+        />
+        <ChartLegend
+          content={<ChartLegendContent />}
+        />
+        {categories.map((category, i) => (
+          <RechartsPrimitive.Line
+            key={category}
+            type="monotone"
+            dataKey={category}
+            stroke={colors[i % colors.length]}
+            strokeWidth={2}
+            dot={{ r: 4 }}
+            activeDot={{ r: 6 }}
+          />
+        ))}
+      </RechartsPrimitive.LineChart>
+    </ChartContainer>
+  );
+};
+
+// Bar Chart Component
+const BarChart: React.FC<ChartProps> = ({
+  data,
+  categories,
+  index,
+  colors = ["blue"],
+  valueFormatter = (value: number) => `${value}`,
+  className,
+}) => {
+  // Create config object for the chart
+  const chartConfig: ChartConfig = {};
+  categories.forEach((category, i) => {
+    chartConfig[category] = {
+      label: category.charAt(0).toUpperCase() + category.slice(1),
+      color: colors[i % colors.length],
+    };
+  });
+
+  return (
+    <ChartContainer className={className} config={chartConfig}>
+      <RechartsPrimitive.BarChart data={data}>
+        <RechartsPrimitive.CartesianGrid strokeDasharray="3 3" />
+        <RechartsPrimitive.XAxis dataKey={index} />
+        <RechartsPrimitive.YAxis tickFormatter={(value) => valueFormatter(value)} />
+        <ChartTooltip
+          content={
+            <ChartTooltipContent
+              formatter={(value: any) => valueFormatter(value)}
+            />
+          }
+        />
+        <ChartLegend
+          content={<ChartLegendContent />}
+        />
+        {categories.map((category, i) => (
+          <RechartsPrimitive.Bar
+            key={category}
+            dataKey={category}
+            fill={colors[i % colors.length]}
+          />
+        ))}
+      </RechartsPrimitive.BarChart>
+    </ChartContainer>
+  );
+};
+
+// Area Chart Component
+const AreaChart: React.FC<ChartProps> = ({
+  data,
+  categories,
+  index,
+  colors = ["blue", "green", "purple"],
+  valueFormatter = (value: number) => `${value}`,
+  className,
+}) => {
+  // Create config object for the chart
+  const chartConfig: ChartConfig = {};
+  categories.forEach((category, i) => {
+    chartConfig[category] = {
+      label: category.charAt(0).toUpperCase() + category.slice(1),
+      color: colors[i % colors.length],
+    };
+  });
+
+  return (
+    <ChartContainer className={className} config={chartConfig}>
+      <RechartsPrimitive.AreaChart data={data}>
+        <RechartsPrimitive.CartesianGrid strokeDasharray="3 3" />
+        <RechartsPrimitive.XAxis dataKey={index} />
+        <RechartsPrimitive.YAxis tickFormatter={(value) => valueFormatter(value)} />
+        <ChartTooltip
+          content={
+            <ChartTooltipContent
+              formatter={(value: any) => valueFormatter(value)}
+            />
+          }
+        />
+        <ChartLegend
+          content={<ChartLegendContent />}
+        />
+        {categories.map((category, i) => (
+          <RechartsPrimitive.Area
+            key={category}
+            type="monotone"
+            dataKey={category}
+            fill={colors[i % colors.length]}
+            stroke={colors[i % colors.length]}
+            fillOpacity={0.3}
+          />
+        ))}
+      </RechartsPrimitive.AreaChart>
+    </ChartContainer>
+  );
+};
+
+// Pie Chart Component
+const PieChart: React.FC<{
+  data: any[];
+  index: string;
+  category: string;
+  colors?: string[];
+  valueFormatter?: (value: number) => string;
+  className?: string;
+}> = ({
+  data,
+  index,
+  category,
+  colors = ["blue", "green", "red", "purple", "orange"],
+  valueFormatter = (value: number) => `${value}`,
+  className,
+}) => {
+  // Create config object for the chart
+  const chartConfig: ChartConfig = {};
+  data.forEach((item, i) => {
+    const indexValue = item[index];
+    chartConfig[indexValue] = {
+      label: indexValue,
+      color: colors[i % colors.length],
+    };
+  });
+
+  return (
+    <ChartContainer className={className} config={chartConfig}>
+      <RechartsPrimitive.PieChart>
+        <ChartTooltip
+          content={
+            <ChartTooltipContent
+              formatter={(value: any) => valueFormatter(value)}
+            />
+          }
+        />
+        <ChartLegend
+          content={<ChartLegendContent />}
+        />
+        <RechartsPrimitive.Pie
+          data={data}
+          nameKey={index}
+          dataKey={category}
+          cx="50%"
+          cy="50%"
+          outerRadius={80}
+          fill="#8884d8"
+          label={(entry) => entry[index]}
+        >
+          {data.map((entry, i) => (
+            <RechartsPrimitive.Cell 
+              key={`cell-${i}`}
+              fill={colors[i % colors.length]} 
+            />
+          ))}
+        </RechartsPrimitive.Pie>
+      </RechartsPrimitive.PieChart>
+    </ChartContainer>
+  );
+};
+
 export {
   ChartContainer,
   ChartTooltip,
@@ -360,4 +578,8 @@ export {
   ChartLegend,
   ChartLegendContent,
   ChartStyle,
+  LineChart,
+  BarChart,
+  AreaChart,
+  PieChart
 }
