@@ -42,7 +42,7 @@ export function Header({
               <span style={{ "--i": 4 } as React.CSSProperties} className="h-5"></span>
               <span style={{ "--i": 5 } as React.CSSProperties} className="h-3"></span>
             </div>
-            <span className="text-xl font-bold gradient-text">SpeakFlow</span>
+            <span className="text-xl font-bold gradient-text">SpeechFlow</span>
           </Link>
         </div>
         <div className="flex items-center gap-2">
