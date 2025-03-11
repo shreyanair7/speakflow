@@ -30,6 +30,16 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { AIChatbot } from "@/components/ai-chatbot";
 
+interface SpeechMetrics {
+  pace: number;          // Words per minute
+  clarity: number;       // 0-100 scale
+  fillerWords: string[]; // List of detected filler words
+  fillerCount: number;   // Total count of filler words
+  sentiment: number;     // -1 to 1 scale (negative to positive)
+  confidence: number;    // 0-100 scale
+  tone: string;          // Descriptive tone assessment
+}
+
 const AnalysisPage = () => {
   const { toast } = useToast();
   const [isRecording, setIsRecording] = useState(false);
@@ -37,10 +47,21 @@ const AnalysisPage = () => {
   const [audioLevel, setAudioLevel] = useState<number[]>([20, 30, 40, 60, 50, 35, 45, 55]);
   const [transcript, setTranscript] = useState<string[]>([]);
   const [interimTranscript, setInterimTranscript] = useState("");
+  const [wordCount, setWordCount] = useState(0);
+  const [speechMetrics, setSpeechMetrics] = useState<SpeechMetrics>({
+    pace: 0,
+    clarity: 0,
+    fillerWords: [],
+    fillerCount: 0,
+    sentiment: 0,
+    confidence: 0,
+    tone: "Neutral"
+  });
   
   // Speech recognition references
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const startTimeRef = useRef<number | null>(null);
 
   // Setup speech recognition
   const setupSpeechRecognition = () => {
@@ -71,6 +92,8 @@ const AnalysisPage = () => {
           const transcript = event.results[i][0].transcript;
           if (event.results[i].isFinal) {
             finalTranscriptText += transcript;
+            // Update speech metrics when we get final results
+            updateSpeechMetrics(transcript, event.results[i][0].confidence);
           } else {
             interimTranscriptText += transcript;
           }
@@ -105,6 +128,80 @@ const AnalysisPage = () => {
     }
   };
 
+  // Update speech metrics based on recognized speech
+  const updateSpeechMetrics = (text: string, confidence: number) => {
+    // Count words in transcript
+    const words = text.split(/\s+/).filter(word => word.length > 0);
+    const newWordCount = wordCount + words.length;
+    setWordCount(newWordCount);
+    
+    // Calculate speech pace (words per minute)
+    if (startTimeRef.current) {
+      const elapsedMinutes = (Date.now() - startTimeRef.current) / 60000;
+      const pace = Math.round(newWordCount / elapsedMinutes);
+      
+      // Find filler words
+      const fillerWords = ['um', 'uh', 'like', 'you know', 'so', 'actually', 'basically', 'literally'];
+      const detectedFillers: string[] = [];
+      let fillerCount = 0;
+      
+      fillerWords.forEach(filler => {
+        const regex = new RegExp(`\\b${filler}\\b`, 'gi');
+        const matches = text.match(regex);
+        if (matches) {
+          detectedFillers.push(filler);
+          fillerCount += matches.length;
+        }
+      });
+      
+      // Simple sentiment analysis
+      const positiveWords = ['good', 'great', 'excellent', 'amazing', 'happy', 'positive', 'wonderful', 'fantastic'];
+      const negativeWords = ['bad', 'poor', 'terrible', 'awful', 'sad', 'negative', 'horrible', 'disappointing'];
+      
+      let sentimentScore = 0;
+      words.forEach(word => {
+        const lowerWord = word.toLowerCase();
+        if (positiveWords.includes(lowerWord)) sentimentScore += 0.1;
+        if (negativeWords.includes(lowerWord)) sentimentScore -= 0.1;
+      });
+      
+      // Clamp sentiment between -1 and 1
+      sentimentScore = Math.max(-1, Math.min(1, sentimentScore));
+      
+      // Derive tone from sentiment and confidence
+      let tone = "Neutral";
+      if (sentimentScore > 0.3) tone = "Positive";
+      else if (sentimentScore < -0.3) tone = "Negative";
+      
+      if (confidence > 0.8) {
+        if (tone === "Neutral") tone = "Confident";
+        else tone = tone + " & Confident";
+      } else if (confidence < 0.4) {
+        if (tone === "Neutral") tone = "Uncertain";
+        else tone = tone + " & Uncertain";
+      }
+      
+      // Calculate clarity based on confidence and pace
+      let clarity = confidence * 80 + 20; // Base clarity on confidence
+      
+      // Adjust clarity based on pace (too fast or too slow reduces clarity)
+      if (pace > 180 || pace < 100) {
+        clarity = Math.max(50, clarity - 20);
+      }
+      
+      // Update metrics
+      setSpeechMetrics({
+        pace: pace,
+        clarity: Math.round(clarity),
+        fillerWords: detectedFillers,
+        fillerCount: fillerCount,
+        sentiment: sentimentScore,
+        confidence: Math.round(confidence * 100),
+        tone: tone
+      });
+    }
+  };
+
   useEffect(() => {
     let audioContext: AudioContext | null = null;
     let analyser: AnalyserNode | null = null;
@@ -112,6 +209,21 @@ const AnalysisPage = () => {
     let dataArray: Uint8Array | null = null;
     
     if (isRecording) {
+      // Set start time for pace calculation
+      startTimeRef.current = Date.now();
+      setWordCount(0);
+      
+      // Reset metrics
+      setSpeechMetrics({
+        pace: 0,
+        clarity: 0,
+        fillerWords: [],
+        fillerCount: 0,
+        sentiment: 0,
+        confidence: 0,
+        tone: "Neutral"
+      });
+      
       // Set up audio processing for visualizing levels
       const setupAudioProcessing = async () => {
         try {
@@ -178,9 +290,13 @@ const AnalysisPage = () => {
         type: "Real-time",
         transcript: transcript.join(' '),
         rating: getRating(transcript.join(' ')),
-        fillerCount: countFillerWords(transcript.join(' ')),
-        clarity: Math.floor(70 + Math.random() * 20), // Simulated clarity score
-        pace: Math.floor(65 + Math.random() * 20)     // Simulated pace score
+        fillerCount: speechMetrics.fillerCount,
+        clarity: speechMetrics.clarity,
+        pace: speechMetrics.pace,
+        sentiment: speechMetrics.sentiment,
+        confidence: speechMetrics.confidence,
+        tone: speechMetrics.tone,
+        fillerWords: speechMetrics.fillerWords
       };
 
       // Get existing speech history or initialize empty array
@@ -194,7 +310,7 @@ const AnalysisPage = () => {
         description: "Your speech recording has been saved to history.",
       });
     }
-  }, [isRecording, transcript, recordingTime]);
+  }, [isRecording, transcript, recordingTime, speechMetrics]);
 
   const toggleRecording = async () => {
     if (!isRecording) {
@@ -265,6 +381,14 @@ const AnalysisPage = () => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  };
+
+  // Helper function to get color based on metric value (0-100)
+  const getMetricColor = (value: number) => {
+    if (value >= 80) return "bg-green-500";
+    if (value >= 60) return "bg-blue-500";
+    if (value >= 40) return "bg-amber-500";
+    return "bg-red-500";
   };
 
   return (
@@ -375,6 +499,78 @@ const AnalysisPage = () => {
               </div>
             </CardContent>
           </Card>
+
+          {/* Speech Metrics Card */}
+          {(isRecording || recordingTime > 0) && (
+            <Card className="border-2 border-navy-100 dark:border-navy-800 mb-6">
+              <CardHeader>
+                <CardTitle>Speech Analysis</CardTitle>
+                <CardDescription>
+                  Real-time metrics on your speaking performance
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Pace */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <h4 className="text-sm font-medium">Speech Pace</h4>
+                      <span className="text-xs text-muted-foreground">{speechMetrics.pace} words/min</span>
+                    </div>
+                    <Progress value={speechMetrics.pace > 180 ? 100 : (speechMetrics.pace / 1.8)} className="h-2" />
+                    <p className="text-xs text-muted-foreground">
+                      {speechMetrics.pace < 100 ? "Speaking too slowly" : 
+                      speechMetrics.pace > 180 ? "Speaking too quickly" : 
+                      "Ideal pace (120-160 wpm)"}
+                    </p>
+                  </div>
+
+                  {/* Clarity */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <h4 className="text-sm font-medium">Clarity</h4>
+                      <span className="text-xs text-muted-foreground">{speechMetrics.clarity}%</span>
+                    </div>
+                    <Progress value={speechMetrics.clarity} className={`h-2 ${getMetricColor(speechMetrics.clarity)}`} />
+                    <p className="text-xs text-muted-foreground">
+                      {speechMetrics.clarity < 40 ? "Poor clarity - speak clearly" : 
+                      speechMetrics.clarity < 70 ? "Moderate clarity - enunciate more" : 
+                      "Good clarity - keep it up!"}
+                    </p>
+                  </div>
+
+                  {/* Filler Words */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <h4 className="text-sm font-medium">Filler Words</h4>
+                      <span className="text-xs text-muted-foreground">{speechMetrics.fillerCount} detected</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {speechMetrics.fillerWords.length > 0 ? (
+                        speechMetrics.fillerWords.map((word, index) => (
+                          <Badge key={index} variant="secondary">{word}</Badge>
+                        ))
+                      ) : (
+                        <p className="text-xs text-muted-foreground">No filler words detected yet</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Tone & Confidence */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <h4 className="text-sm font-medium">Tone & Confidence</h4>
+                      <span className="text-xs text-muted-foreground">{speechMetrics.tone}</span>
+                    </div>
+                    <Progress value={speechMetrics.confidence} className={`h-2 ${getMetricColor(speechMetrics.confidence)}`} />
+                    <p className="text-xs text-muted-foreground">
+                      Confidence level: {speechMetrics.confidence}%
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         <div>

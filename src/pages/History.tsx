@@ -25,8 +25,9 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
-import { Play, Download, MoreVertical, Search, Filter, Calendar, CheckCircle2 } from "lucide-react";
+import { Play, Download, MoreVertical, Search, Filter, Calendar, CheckCircle2, Activity, VolumeX, BarChart } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface SpeechRecord {
   id: number;
@@ -38,6 +39,10 @@ interface SpeechRecord {
   fillerCount: number;
   clarity: number;
   pace: number;
+  sentiment?: number;
+  confidence?: number;
+  tone?: string;
+  fillerWords?: string[];
   transcript?: string;
 }
 
@@ -45,6 +50,8 @@ const HistoryPage = () => {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [speechHistory, setSpeechHistory] = useState<SpeechRecord[]>([]);
+  const [selectedSpeech, setSelectedSpeech] = useState<SpeechRecord | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   
   // Load speech history from localStorage
   useEffect(() => {
@@ -74,6 +81,14 @@ const HistoryPage = () => {
     }
   };
 
+  // Badge color for metrics
+  const getMetricBadgeColor = (value: number) => {
+    if (value >= 80) return "bg-green-500";
+    if (value >= 60) return "bg-blue-500";
+    if (value >= 40) return "bg-amber-500";
+    return "bg-red-500";
+  };
+
   // Delete speech record
   const deleteSpeechRecord = (id: number) => {
     const updatedHistory = speechHistory.filter(speech => speech.id !== id);
@@ -88,11 +103,8 @@ const HistoryPage = () => {
 
   // View speech details
   const viewSpeechDetails = (speech: SpeechRecord) => {
-    // In a real app, this would open a detailed view
-    toast({
-      title: speech.title,
-      description: speech.transcript || "No transcript available"
-    });
+    setSelectedSpeech(speech);
+    setDetailsOpen(true);
   };
 
   return (
@@ -181,7 +193,7 @@ const HistoryPage = () => {
                     <TableHead>Date</TableHead>
                     <TableHead>Duration</TableHead>
                     <TableHead>Type</TableHead>
-                    <TableHead>Rating</TableHead>
+                    <TableHead>Metrics</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -197,9 +209,16 @@ const HistoryPage = () => {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Badge className={getRatingBadgeColor(speech.rating)}>
-                          {speech.rating}
-                        </Badge>
+                        <div className="flex flex-wrap gap-1">
+                          <Badge className={getRatingBadgeColor(speech.rating)}>
+                            {speech.rating}
+                          </Badge>
+                          {speech.clarity && (
+                            <Badge className={getMetricBadgeColor(speech.clarity)} variant="outline">
+                              {speech.clarity}% clarity
+                            </Badge>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center space-x-2">
@@ -257,6 +276,133 @@ const HistoryPage = () => {
           </div>
         </CardFooter>
       </Card>
+
+      {/* Speech Details Dialog */}
+      <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
+        <DialogContent className="max-w-3xl">
+          {selectedSpeech && (
+            <>
+              <DialogHeader>
+                <DialogTitle>{selectedSpeech.title}</DialogTitle>
+                <DialogDescription>
+                  {selectedSpeech.date} • {selectedSpeech.duration} • {selectedSpeech.type}
+                </DialogDescription>
+              </DialogHeader>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 my-4">
+                <Card>
+                  <CardHeader className="py-3">
+                    <CardTitle className="text-base">Performance Metrics</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      <div>
+                        <div className="flex justify-between mb-1">
+                          <span className="text-sm font-medium">Overall Rating</span>
+                          <Badge className={getRatingBadgeColor(selectedSpeech.rating)}>
+                            {selectedSpeech.rating}
+                          </Badge>
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="flex justify-between mb-1">
+                          <span className="text-sm font-medium">Speech Pace</span>
+                          <span className="text-sm">{selectedSpeech.pace} wpm</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Activity className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground">
+                            {selectedSpeech.pace < 100 ? "Too slow" : 
+                             selectedSpeech.pace > 180 ? "Too fast" : 
+                             "Ideal pace"}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="flex justify-between mb-1">
+                          <span className="text-sm font-medium">Clarity</span>
+                          <span className="text-sm">{selectedSpeech.clarity}%</span>
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="flex justify-between mb-1">
+                          <span className="text-sm font-medium">Filler Words</span>
+                          <span className="text-sm">{selectedSpeech.fillerCount} detected</span>
+                        </div>
+                        {selectedSpeech.fillerWords && selectedSpeech.fillerWords.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {selectedSpeech.fillerWords.map((word, index) => (
+                              <Badge key={index} variant="outline">{word}</Badge>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {selectedSpeech.tone && (
+                        <div>
+                          <div className="flex justify-between mb-1">
+                            <span className="text-sm font-medium">Tone & Confidence</span>
+                          </div>
+                          <div className="flex gap-2">
+                            <Badge variant="secondary">{selectedSpeech.tone}</Badge>
+                            {selectedSpeech.confidence && (
+                              <Badge 
+                                className={getMetricBadgeColor(selectedSpeech.confidence)}
+                                variant="outline"
+                              >
+                                {selectedSpeech.confidence}% confidence
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="py-3">
+                    <CardTitle className="text-base">Transcript</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="bg-slate-50 dark:bg-slate-900 rounded-md p-4 max-h-60 overflow-y-auto">
+                      {selectedSpeech.transcript ? (
+                        <p className="text-sm">{selectedSpeech.transcript}</p>
+                      ) : (
+                        <p className="text-sm text-muted-foreground text-center py-6">No transcript available</p>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="flex justify-end space-x-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setDetailsOpen(false)}
+                >
+                  Close
+                </Button>
+                <Button
+                  onClick={() => {
+                    // In a real app, would download the recording
+                    toast({
+                      title: "Download not available",
+                      description: "This feature is not implemented in the demo."
+                    });
+                  }}
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  Download Recording
+                </Button>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
