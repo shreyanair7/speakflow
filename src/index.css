@@ -2,113 +2,83 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
+ 
 @layer base {
   :root {
     --background: 0 0% 100%;
-    --foreground: 214 60% 21%;
-
+    --foreground: 240 10% 3.9%;
     --card: 0 0% 100%;
-    --card-foreground: 214 60% 21%;
-
+    --card-foreground: 240 10% 3.9%;
     --popover: 0 0% 100%;
-    --popover-foreground: 214 60% 21%;
-
-    --primary: 214 60% 21%;
+    --popover-foreground: 240 10% 3.9%;
+    --primary: 240 5.9% 10%;
     --primary-foreground: 0 0% 98%;
-
-    --secondary: 213 100% 96%;
-    --secondary-foreground: 214 60% 21%;
-
-    --muted: 213 50% 96%;
-    --muted-foreground: 214 20% 46%;
-
-    --accent: 213 50% 96%;
-    --accent-foreground: 214 60% 21%;
-
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
-
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 214 60% 50%;
-
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --ring: 240 5.9% 10%;
     --radius: 0.5rem;
-
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --navy-50: 220 50% 95%;
+    --navy-100: 220 50% 90%;
+    --navy-400: 220 50% 60%;
+    --navy-600: 220 50% 40%;
+    --navy-700: 220 50% 30%;
+    --navy-800: 220 50% 20%;
+    --navy-900: 220 50% 10%;
   }
-
+ 
   .dark {
-    --background: 224 71% 4%;
-    --foreground: 213 30% 98%;
-
-    --card: 224 71% 4%;
-    --card-foreground: 213 30% 98%;
-
-    --popover: 224 71% 4%;
-    --popover-foreground: 213 30% 98%;
-
-    --primary: 213 100% 98%;
-    --primary-foreground: 214 60% 21%;
-
-    --secondary: 214 60% 10%;
-    --secondary-foreground: 213 30% 98%;
-
-    --muted: 214 50% 10%;
-    --muted-foreground: 214 20% 70%;
-
-    --accent: 214 50% 10%;
-    --accent-foreground: 213 30% 98%;
-
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 240 5.9% 10%;
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+    --accent: 240 3.7% 15.9%;
+    --accent-foreground: 0 0% 98%;
     --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 213 30% 98%;
-
-    --border: 214 50% 20%;
-    --input: 214 50% 20%;
-    --ring: 214 70% 70%;
-
-    --sidebar-background: 224 71% 4%;
-    --sidebar-foreground: 213 30% 98%;
-    --sidebar-primary: 214 70% 70%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 214 50% 10%;
-    --sidebar-accent-foreground: 213 30% 98%;
-    --sidebar-border: 214 50% 20%;
-    --sidebar-ring: 214 70% 70%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 240 4.9% 83.9%;
   }
 }
-
+ 
 @layer base {
   * {
     @apply border-border;
   }
-
   body {
     @apply bg-background text-foreground;
   }
 }
 
-.glassmorphism {
-  @apply bg-white/10 backdrop-blur-md border border-white/20 shadow-lg;
+@keyframes wave {
+  0% {
+    height: var(--height);
+  }
+  50% {
+    height: calc(var(--height) * 0.8);
+  }
+  100% {
+    height: var(--height);
+  }
 }
 
-.dark .glassmorphism {
-  @apply bg-navy-950/40 backdrop-blur-md border border-navy-800/30 shadow-lg;
-}
-
-.wave-animation span {
-  @apply inline-block bg-primary w-1 mx-0.5 rounded-full;
+.animate-wave {
   animation: wave 1s ease-in-out infinite;
-  animation-delay: calc(0.1s * var(--i));
-}
-
-.gradient-text {
-  @apply bg-gradient-to-r from-navy-600 to-navy-800 dark:from-white dark:to-blue-300 bg-clip-text text-transparent;
+  animation-play-state: running;
 }
