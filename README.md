@@ -1,7 +1,3 @@
-Here's the corrected README without the word "Lovable":  
-
----
-
 # SpeechFlow  
 
 SpeechFlow is an advanced speech-to-text processing platform built with modern technologies like Vite, TypeScript, React, shadcn-ui, and Tailwind CSS.  
