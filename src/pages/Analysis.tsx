@@ -167,6 +167,35 @@ const AnalysisPage = () => {
     };
   }, [isRecording]);
 
+  // Save transcript to localStorage when recording stops
+  useEffect(() => {
+    if (!isRecording && transcript.length > 0 && recordingTime > 0) {
+      const speechData = {
+        id: Date.now(),
+        title: `Speech ${new Date().toLocaleString()}`,
+        date: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
+        duration: formatTime(recordingTime),
+        type: "Real-time",
+        transcript: transcript.join(' '),
+        rating: getRating(transcript.join(' ')),
+        fillerCount: countFillerWords(transcript.join(' ')),
+        clarity: Math.floor(70 + Math.random() * 20), // Simulated clarity score
+        pace: Math.floor(65 + Math.random() * 20)     // Simulated pace score
+      };
+
+      // Get existing speech history or initialize empty array
+      const existingHistory = JSON.parse(localStorage.getItem('speechHistory') || '[]');
+      
+      // Add new speech data to history
+      localStorage.setItem('speechHistory', JSON.stringify([speechData, ...existingHistory]));
+      
+      toast({
+        title: "Speech Saved",
+        description: "Your speech recording has been saved to history.",
+      });
+    }
+  }, [isRecording, transcript, recordingTime]);
+
   const toggleRecording = async () => {
     if (!isRecording) {
       // Start recording
@@ -205,6 +234,31 @@ const AnalysisPage = () => {
         description: "Your recording has been analyzed.",
       });
     }
+  };
+
+  // Helper function to count filler words
+  const countFillerWords = (text: string): number => {
+    const fillerWords = ['um', 'uh', 'like', 'you know', 'so', 'actually', 'basically', 'literally'];
+    const lowerText = text.toLowerCase();
+    return fillerWords.reduce((count, word) => {
+      const regex = new RegExp(`\\b${word}\\b`, 'gi');
+      const matches = lowerText.match(regex);
+      return count + (matches ? matches.length : 0);
+    }, 0);
+  };
+
+  // Helper function to determine rating
+  const getRating = (text: string): string => {
+    const fillerCount = countFillerWords(text);
+    const wordCount = text.split(/\s+/).length;
+    
+    if (wordCount < 10) return "Needs Work"; // Too short to evaluate properly
+    
+    const fillerRatio = fillerCount / wordCount;
+    
+    if (fillerRatio < 0.03) return "Excellent";
+    if (fillerRatio < 0.07) return "Good";
+    return "Needs Work";
   };
 
   const formatTime = (seconds: number) => {
@@ -266,15 +320,16 @@ const AnalysisPage = () => {
                     }`}
                     style={{ 
                       height: `${isRecording ? level : 5}%`, 
-                      animationDelay: `${index * 0.1}s` 
-                    }}
+                      animationDelay: `${index * 0.1}s`,
+                      "--height": `${level}%`
+                    } as React.CSSProperties}
                   ></div>
                 ))}
               </div>
               
               {!isRecording && recordingTime > 0 && (
                 <div className="bg-green-50 dark:bg-green-900 border border-green-200 dark:border-green-800 rounded-md p-3 text-green-800 dark:text-green-200 text-sm">
-                  Analysis complete! Scroll down to see your results.
+                  Analysis complete! Scroll down to see your results. Your speech has been saved to history.
                 </div>
               )}
               

@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   Card, 
   CardContent, 
@@ -25,95 +25,39 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
-import { Play, Download, MoreVertical, Search, Filter, Calendar, CheckCircle2, XCircle } from "lucide-react";
+import { Play, Download, MoreVertical, Search, Filter, Calendar, CheckCircle2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+
+interface SpeechRecord {
+  id: number;
+  title: string;
+  date: string;
+  duration: string;
+  type: string;
+  rating: string;
+  fillerCount: number;
+  clarity: number;
+  pace: number;
+  transcript?: string;
+}
 
 const HistoryPage = () => {
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
+  const [speechHistory, setSpeechHistory] = useState<SpeechRecord[]>([]);
   
-  // Sample data for speech history
-  const speechHistory = [
-    {
-      id: 1,
-      title: "Project Presentation",
-      date: "May 15, 2023",
-      duration: "4:32",
-      type: "Uploaded",
-      rating: "Good",
-      fillerCount: 12,
-      clarity: 75,
-      pace: 68
-    },
-    {
-      id: 2,
-      title: "Team Meeting",
-      date: "May 18, 2023",
-      duration: "8:45",
-      type: "Real-time",
-      rating: "Excellent",
-      fillerCount: 8,
-      clarity: 82,
-      pace: 76
-    },
-    {
-      id: 3,
-      title: "Interview Practice",
-      date: "May 22, 2023",
-      duration: "12:20",
-      type: "Uploaded",
-      rating: "Needs Work",
-      fillerCount: 24,
-      clarity: 60,
-      pace: 55
-    },
-    {
-      id: 4,
-      title: "Sales Pitch",
-      date: "May 25, 2023",
-      duration: "6:15",
-      type: "Real-time",
-      rating: "Good",
-      fillerCount: 15,
-      clarity: 72,
-      pace: 70
-    },
-    {
-      id: 5,
-      title: "Conference Talk",
-      date: "May 30, 2023",
-      duration: "15:47",
-      type: "Uploaded",
-      rating: "Excellent",
-      fillerCount: 5,
-      clarity: 88,
-      pace: 82
-    },
-    {
-      id: 6,
-      title: "Practice Speech",
-      date: "June 2, 2023",
-      duration: "3:28",
-      type: "Real-time",
-      rating: "Good",
-      fillerCount: 10,
-      clarity: 74,
-      pace: 72
-    },
-    {
-      id: 7,
-      title: "Customer Presentation",
-      date: "June 5, 2023",
-      duration: "9:12",
-      type: "Uploaded",
-      rating: "Excellent",
-      fillerCount: 7,
-      clarity: 86,
-      pace: 80
+  // Load speech history from localStorage
+  useEffect(() => {
+    const savedHistory = localStorage.getItem('speechHistory');
+    if (savedHistory) {
+      setSpeechHistory(JSON.parse(savedHistory));
     }
-  ];
+  }, []);
   
   // Filter speech history based on search term
   const filteredHistory = speechHistory.filter(speech => 
-    speech.title.toLowerCase().includes(searchTerm.toLowerCase())
+    speech.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (speech.transcript && speech.transcript.toLowerCase().includes(searchTerm.toLowerCase()))
   );
   
   // Badge color based on rating
@@ -128,6 +72,27 @@ const HistoryPage = () => {
       default:
         return "";
     }
+  };
+
+  // Delete speech record
+  const deleteSpeechRecord = (id: number) => {
+    const updatedHistory = speechHistory.filter(speech => speech.id !== id);
+    setSpeechHistory(updatedHistory);
+    localStorage.setItem('speechHistory', JSON.stringify(updatedHistory));
+    
+    toast({
+      title: "Recording deleted",
+      description: "The speech recording has been removed from your history."
+    });
+  };
+
+  // View speech details
+  const viewSpeechDetails = (speech: SpeechRecord) => {
+    // In a real app, this would open a detailed view
+    toast({
+      title: speech.title,
+      description: speech.transcript || "No transcript available"
+    });
   };
 
   return (
@@ -207,64 +172,76 @@ const HistoryPage = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Title</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Duration</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Rating</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredHistory.map((speech) => (
-                  <TableRow key={speech.id}>
-                    <TableCell className="font-medium">{speech.title}</TableCell>
-                    <TableCell>{speech.date}</TableCell>
-                    <TableCell>{speech.duration}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className={speech.type === "Uploaded" ? "text-blue-600" : "text-green-600"}>
-                        {speech.type}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={getRatingBadgeColor(speech.rating)}>
-                        {speech.rating}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center space-x-2">
-                        <Button variant="ghost" size="icon" title="Play">
-                          <Play className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" title="Download">
-                          <Download className="h-4 w-4" />
-                        </Button>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem>View Details</DropdownMenuItem>
-                            <DropdownMenuItem>View Analysis</DropdownMenuItem>
-                            <DropdownMenuItem>Compare</DropdownMenuItem>
-                            <DropdownMenuItem className="text-red-600">
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </TableCell>
+          {filteredHistory.length > 0 ? (
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Title</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Duration</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Rating</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                </TableHeader>
+                <TableBody>
+                  {filteredHistory.map((speech) => (
+                    <TableRow key={speech.id}>
+                      <TableCell className="font-medium">{speech.title}</TableCell>
+                      <TableCell>{speech.date}</TableCell>
+                      <TableCell>{speech.duration}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={speech.type === "Uploaded" ? "text-blue-600" : "text-green-600"}>
+                          {speech.type}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={getRatingBadgeColor(speech.rating)}>
+                          {speech.rating}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-2">
+                          <Button variant="ghost" size="icon" title="Play">
+                            <Play className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" title="Download">
+                            <Download className="h-4 w-4" />
+                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => viewSpeechDetails(speech)}>
+                                View Details
+                              </DropdownMenuItem>
+                              <DropdownMenuItem>View Analysis</DropdownMenuItem>
+                              <DropdownMenuItem>Compare</DropdownMenuItem>
+                              <DropdownMenuItem 
+                                className="text-red-600"
+                                onClick={() => deleteSpeechRecord(speech.id)}
+                              >
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          ) : (
+            <div className="text-center py-10 text-muted-foreground">
+              <p>No speech recordings found.</p>
+              <p className="mt-2">Start recording on the Analysis page to see your history here.</p>
+            </div>
+          )}
         </CardContent>
         <CardFooter className="flex justify-between">
           <div className="text-sm text-muted-foreground">
@@ -274,7 +251,7 @@ const HistoryPage = () => {
             <Button variant="outline" size="sm" disabled>
               Previous
             </Button>
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" disabled={filteredHistory.length === 0}>
               Next
             </Button>
           </div>
