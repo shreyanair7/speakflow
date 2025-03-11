@@ -28,6 +28,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
+import { Input } from "@/components/ui/input";
 
 const AnalysisPage = () => {
   const { toast } = useToast();
@@ -39,6 +40,8 @@ const AnalysisPage = () => {
   const [clarity, setClarity] = useState(0);
   const [tone, setTone] = useState(0);
   const [feedback, setFeedback] = useState<string[]>([]);
+  const [transcript, setTranscript] = useState<string[]>([]);
+  const [currentSentence, setCurrentSentence] = useState("");
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -82,6 +85,9 @@ const AnalysisPage = () => {
               setFeedback((prev) => [...prev, newFeedback]);
             }
           }
+
+          // Simulate real-time transcription
+          simulateTranscription();
         }
       }, 1000);
     }
@@ -90,6 +96,78 @@ const AnalysisPage = () => {
       if (interval) clearInterval(interval);
     };
   }, [isRecording, recordingTime, pace, clarity, tone, feedback]);
+
+  // Simulate real-time transcription
+  const simulateTranscription = () => {
+    const phrases = [
+      "Today I want to talk about effective communication.",
+      "Public speaking is an essential skill in any profession.",
+      "It's important to vary your tone when speaking to an audience.",
+      "Making eye contact helps engage your listeners.",
+      "Speaking clearly and at a moderate pace improves comprehension.",
+      "Using hand gestures can emphasize key points in your presentation.",
+      "Remember to pause occasionally to let your points sink in.",
+      "Storytelling is a powerful way to connect with your audience.",
+      "Practice regularly to build confidence in your speaking abilities.",
+      "Breathing techniques can help manage speaking anxiety."
+    ];
+
+    // Get a random word or complete the current sentence
+    if (currentSentence === "" || Math.random() > 0.7) {
+      // Start a new sentence
+      const randomPhrase = phrases[Math.floor(Math.random() * phrases.length)];
+      const words = randomPhrase.split(" ");
+      // Start with the first word
+      setCurrentSentence(words[0]);
+      
+      // If the previous sentence was complete, add it to transcript
+      if (transcript.length > 0 && transcript[transcript.length - 1].endsWith(".")) {
+        // Start a new sentence in the transcript
+        setTranscript([...transcript, words[0]]);
+      } else if (transcript.length === 0) {
+        // First word ever
+        setTranscript([words[0]]);
+      } else {
+        // Continue adding to the current sentence in transcript
+        const updatedTranscript = [...transcript];
+        updatedTranscript[updatedTranscript.length - 1] += ` ${words[0]}`;
+        setTranscript(updatedTranscript);
+      }
+    } else {
+      // Continue the current sentence
+      const currentPhraseIndex = phrases.findIndex(phrase => 
+        phrase.startsWith(currentSentence) || 
+        currentSentence.includes(phrase.split(" ")[0])
+      );
+      
+      if (currentPhraseIndex >= 0) {
+        const currentPhrase = phrases[currentPhraseIndex];
+        const words = currentPhrase.split(" ");
+        const currentWordIndex = words.findIndex(word => currentSentence.endsWith(word));
+        
+        if (currentWordIndex >= 0 && currentWordIndex < words.length - 1) {
+          // Add the next word
+          const nextWord = words[currentWordIndex + 1];
+          setCurrentSentence(`${currentSentence} ${nextWord}`);
+          
+          // Update the transcript
+          const updatedTranscript = [...transcript];
+          updatedTranscript[updatedTranscript.length - 1] += ` ${nextWord}`;
+          setTranscript(updatedTranscript);
+        } else {
+          // End of sentence, add period
+          if (!currentSentence.endsWith(".")) {
+            setCurrentSentence(`${currentSentence}.`);
+            
+            // Update the transcript
+            const updatedTranscript = [...transcript];
+            updatedTranscript[updatedTranscript.length - 1] += ".";
+            setTranscript(updatedTranscript);
+          }
+        }
+      }
+    }
+  };
 
   const toggleRecording = () => {
     if (!isRecording) {
@@ -101,6 +179,8 @@ const AnalysisPage = () => {
       setClarity(0);
       setTone(0);
       setFeedback([]);
+      setTranscript([]);
+      setCurrentSentence("");
       
       toast({
         title: "Recording started",
@@ -198,6 +278,43 @@ const AnalysisPage = () => {
               )}
             </CardContent>
           </Card>
+
+          {/* Live Transcript Card */}
+          {(isRecording || recordingTime > 0) && (
+            <Card className="border-2 border-navy-100 dark:border-navy-800 mb-6">
+              <CardHeader>
+                <CardTitle>Live Transcript</CardTitle>
+                <CardDescription>
+                  Real-time transcription of your speech
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="bg-slate-50 dark:bg-slate-900 rounded-md p-4 min-h-32 max-h-52 overflow-y-auto">
+                  {transcript.length > 0 ? (
+                    <div className="space-y-2">
+                      {transcript.map((line, index) => (
+                        <p key={index} className="text-slate-800 dark:text-slate-200">
+                          {line}
+                        </p>
+                      ))}
+                      {isRecording && (
+                        <div className="flex items-center">
+                          <span className="text-navy-600 dark:text-navy-400 font-medium">
+                            Listening
+                          </span>
+                          <span className="animate-pulse ml-1">...</span>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-center text-slate-500 dark:text-slate-400 py-10">
+                      {isRecording ? "Listening for speech..." : "No transcript available yet"}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {(isRecording || recordingTime > 0) && (
             <Card className="border-2 border-navy-100 dark:border-navy-800">
