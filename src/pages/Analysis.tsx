@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { 
   Mic, 
   Square, 
@@ -28,7 +28,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { Input } from "@/components/ui/input";
+import { AIChatbot } from "@/components/ai-chatbot";
 
 const AnalysisPage = () => {
   const { toast } = useToast();
@@ -41,154 +41,211 @@ const AnalysisPage = () => {
   const [tone, setTone] = useState(0);
   const [feedback, setFeedback] = useState<string[]>([]);
   const [transcript, setTranscript] = useState<string[]>([]);
-  const [currentSentence, setCurrentSentence] = useState("");
+  
+  // New state for audio recording
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Function to request microphone access and set up recording
+  const setupRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      
+      // Set up event handlers for the media recorder
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+      
+      mediaRecorder.onstop = () => {
+        processAudio();
+      };
+      
+      return true;
+    } catch (error) {
+      console.error("Error accessing microphone:", error);
+      toast({
+        title: "Microphone access denied",
+        description: "Please allow microphone access to use this feature.",
+      });
+      return false;
+    }
+  };
+  
+  // Function to process recorded audio with Whisper API
+  const processAudio = async () => {
+    if (audioChunksRef.current.length === 0) return;
+    
+    const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+    const formData = new FormData();
+    formData.append('file', audioBlob, 'recording.webm');
+    formData.append('model', 'whisper-1');
+    
+    try {
+      const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.OPENAI_API_KEY || ''}`,
+        },
+        body: formData
+      });
+      
+      if (!response.ok) {
+        throw new Error(`API request failed with status ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (data.text) {
+        // Add the new transcription to the transcript array
+        setTranscript(prevTranscript => [...prevTranscript, data.text]);
+      }
+    } catch (error) {
+      console.error("Error transcribing audio:", error);
+      toast({
+        title: "Transcription error",
+        description: "Failed to transcribe audio. Please try again.",
+        variant: "destructive",
+      });
+    }
+    
+    // Clear the audio chunks for the next recording
+    audioChunksRef.current = [];
+  };
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let audioContext: AudioContext | null = null;
+    let analyser: AnalyserNode | null = null;
+    let microphone: MediaStreamAudioSourceNode | null = null;
+    let dataArray: Uint8Array | null = null;
     
     if (isRecording) {
-      interval = setInterval(() => {
-        setRecordingTime((prev) => prev + 1);
-        
-        // Simulate audio level changes
-        setAudioLevel((prev) => {
-          const newLevels = [...prev];
-          newLevels.shift();
-          newLevels.push(Math.floor(Math.random() * 70) + 10);
-          return newLevels;
-        });
-        
-        // Simulate real-time analysis after 5 seconds
-        if (recordingTime > 5 && recordingTime % 3 === 0) {
-          // Random chance of detecting a filler word
-          if (Math.random() > 0.6) {
-            const fillers = ["um", "uh", "like", "you know", "actually"];
-            const newFiller = fillers[Math.floor(Math.random() * fillers.length)];
-            setFillerWords((prev) => [...prev, newFiller]);
+      // Set up audio processing for visualizing levels
+      const setupAudioProcessing = async () => {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          audioContext = new AudioContext();
+          analyser = audioContext.createAnalyser();
+          microphone = audioContext.createMediaStreamSource(stream);
+          microphone.connect(analyser);
+          analyser.fftSize = 256;
+          const bufferLength = analyser.frequencyBinCount;
+          dataArray = new Uint8Array(bufferLength);
+          
+          // Start recording
+          if (mediaRecorderRef.current) {
+            mediaRecorderRef.current.start(2000); // Collect data every 2 seconds
           }
           
-          // Update metrics
-          setPace(Math.min(100, Math.floor(Math.random() * 20) + pace));
-          setClarity(Math.min(100, Math.floor(Math.random() * 15) + clarity));
-          setTone(Math.min(100, Math.floor(Math.random() * 10) + tone));
-          
-          // Add feedback after 10 seconds
-          if (recordingTime > 10 && feedback.length < 2) {
-            const feedbackOptions = [
-              "Try to speak slower for better clarity",
-              "Great job on varying your tone",
-              "Consider adding more pauses for emphasis",
-              "Your pronunciation is improving"
-            ];
-            const newFeedback = feedbackOptions[Math.floor(Math.random() * feedbackOptions.length)];
-            if (!feedback.includes(newFeedback)) {
-              setFeedback((prev) => [...prev, newFeedback]);
+          // Set up the interval to update the audio levels and process chunks
+          intervalRef.current = setInterval(() => {
+            setRecordingTime((prev) => prev + 1);
+            
+            // Update audio level visualization
+            if (analyser && dataArray) {
+              analyser.getByteFrequencyData(dataArray);
+              const average = Array.from(dataArray).reduce((sum, value) => sum + value, 0) / dataArray.length;
+              const normalizedLevels = Array.from({ length: 8 }, () => 
+                Math.min(Math.floor(average * (0.5 + Math.random() * 0.5)), 100)
+              );
+              setAudioLevel(normalizedLevels);
             }
-          }
-
-          // Simulate real-time transcription
-          simulateTranscription();
+            
+            // Simulate other metrics updates (this would be replaced with real analysis in production)
+            updateMetrics();
+          }, 1000);
+        } catch (error) {
+          console.error("Error setting up audio processing:", error);
         }
-      }, 1000);
+      };
+      
+      setupAudioProcessing();
     }
     
     return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [isRecording, recordingTime, pace, clarity, tone, feedback]);
-
-  // Simulate real-time transcription
-  const simulateTranscription = () => {
-    const phrases = [
-      "Today I want to talk about effective communication.",
-      "Public speaking is an essential skill in any profession.",
-      "It's important to vary your tone when speaking to an audience.",
-      "Making eye contact helps engage your listeners.",
-      "Speaking clearly and at a moderate pace improves comprehension.",
-      "Using hand gestures can emphasize key points in your presentation.",
-      "Remember to pause occasionally to let your points sink in.",
-      "Storytelling is a powerful way to connect with your audience.",
-      "Practice regularly to build confidence in your speaking abilities.",
-      "Breathing techniques can help manage speaking anxiety."
-    ];
-
-    // Get a random word or complete the current sentence
-    if (currentSentence === "" || Math.random() > 0.7) {
-      // Start a new sentence
-      const randomPhrase = phrases[Math.floor(Math.random() * phrases.length)];
-      const words = randomPhrase.split(" ");
-      // Start with the first word
-      setCurrentSentence(words[0]);
-      
-      // If the previous sentence was complete, add it to transcript
-      if (transcript.length > 0 && transcript[transcript.length - 1].endsWith(".")) {
-        // Start a new sentence in the transcript
-        setTranscript([...transcript, words[0]]);
-      } else if (transcript.length === 0) {
-        // First word ever
-        setTranscript([words[0]]);
-      } else {
-        // Continue adding to the current sentence in transcript
-        const updatedTranscript = [...transcript];
-        updatedTranscript[updatedTranscript.length - 1] += ` ${words[0]}`;
-        setTranscript(updatedTranscript);
+      // Clean up
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
       }
-    } else {
-      // Continue the current sentence
-      const currentPhraseIndex = phrases.findIndex(phrase => 
-        phrase.startsWith(currentSentence) || 
-        currentSentence.includes(phrase.split(" ")[0])
-      );
       
-      if (currentPhraseIndex >= 0) {
-        const currentPhrase = phrases[currentPhraseIndex];
-        const words = currentPhrase.split(" ");
-        const currentWordIndex = words.findIndex(word => currentSentence.endsWith(word));
-        
-        if (currentWordIndex >= 0 && currentWordIndex < words.length - 1) {
-          // Add the next word
-          const nextWord = words[currentWordIndex + 1];
-          setCurrentSentence(`${currentSentence} ${nextWord}`);
-          
-          // Update the transcript
-          const updatedTranscript = [...transcript];
-          updatedTranscript[updatedTranscript.length - 1] += ` ${nextWord}`;
-          setTranscript(updatedTranscript);
-        } else {
-          // End of sentence, add period
-          if (!currentSentence.endsWith(".")) {
-            setCurrentSentence(`${currentSentence}.`);
-            
-            // Update the transcript
-            const updatedTranscript = [...transcript];
-            updatedTranscript[updatedTranscript.length - 1] += ".";
-            setTranscript(updatedTranscript);
-          }
-        }
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
+      
+      if (microphone) {
+        microphone.disconnect();
+      }
+      
+      if (audioContext) {
+        audioContext.close();
+      }
+    };
+  }, [isRecording]);
+
+  // Function to simulate updating metrics (would be replaced with real analysis)
+  const updateMetrics = () => {
+    // Simulate pace, clarity, and tone updates
+    setPace(prev => Math.min(100, prev + Math.floor(Math.random() * 5)));
+    setClarity(prev => Math.min(100, prev + Math.floor(Math.random() * 4)));
+    setTone(prev => Math.min(100, prev + Math.floor(Math.random() * 3)));
+    
+    // Simulate detecting filler words
+    if (Math.random() > 0.8) {
+      const fillers = ["um", "uh", "like", "you know", "actually"];
+      const newFiller = fillers[Math.floor(Math.random() * fillers.length)];
+      setFillerWords(prev => [...prev, newFiller]);
+    }
+    
+    // Simulate feedback
+    if (Math.random() > 0.9 && feedback.length < 3) {
+      const feedbackOptions = [
+        "Try to speak slower for better clarity",
+        "Great job on varying your tone",
+        "Consider adding more pauses for emphasis",
+        "Your pronunciation is improving"
+      ];
+      const newFeedback = feedbackOptions[Math.floor(Math.random() * feedbackOptions.length)];
+      if (!feedback.includes(newFeedback)) {
+        setFeedback(prev => [...prev, newFeedback]);
       }
     }
   };
 
-  const toggleRecording = () => {
+  const toggleRecording = async () => {
     if (!isRecording) {
       // Start recording
-      setIsRecording(true);
-      setRecordingTime(0);
-      setFillerWords([]);
-      setPace(0);
-      setClarity(0);
-      setTone(0);
-      setFeedback([]);
-      setTranscript([]);
-      setCurrentSentence("");
-      
-      toast({
-        title: "Recording started",
-        description: "Speak clearly into your microphone.",
-      });
+      const success = await setupRecording();
+      if (success) {
+        setIsRecording(true);
+        setRecordingTime(0);
+        setFillerWords([]);
+        setPace(0);
+        setClarity(0);
+        setTone(0);
+        setFeedback([]);
+        setTranscript([]);
+        
+        toast({
+          title: "Recording started",
+          description: "Speak clearly into your microphone.",
+        });
+      }
     } else {
       // Stop recording
       setIsRecording(false);
+      
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+      
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
       
       toast({
         title: "Recording stopped",
@@ -285,7 +342,7 @@ const AnalysisPage = () => {
               <CardHeader>
                 <CardTitle>Live Transcript</CardTitle>
                 <CardDescription>
-                  Real-time transcription of your speech
+                  Real-time transcription of your speech using Whisper API
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -432,49 +489,14 @@ const AnalysisPage = () => {
         <div>
           <Card className="border-2 border-navy-100 dark:border-navy-800 sticky top-20">
             <CardHeader>
-              <CardTitle>Speaking Tips</CardTitle>
+              <CardTitle>AI Feedback</CardTitle>
+              <CardDescription>
+                Get personalized feedback on your speaking skills
+              </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <h3 className="font-medium mb-1 flex items-center">
-                  <VolumeX className="h-4 w-4 mr-2" />
-                  Avoid Filler Words
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  Replace "um," "uh," and "like" with strategic pauses that add emphasis.
-                </p>
-              </div>
-              
-              <Separator />
-              
-              <div>
-                <h3 className="font-medium mb-1 flex items-center">
-                  <Volume2 className="h-4 w-4 mr-2" />
-                  Vary Your Tone
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  Modulate your voice to emphasize key points and maintain engagement.
-                </p>
-              </div>
-              
-              <Separator />
-              
-              <div>
-                <h3 className="font-medium mb-1 flex items-center">
-                  <AlertCircle className="h-4 w-4 mr-2" />
-                  Monitor Your Pace
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  Speak at a measured rate—not too fast to comprehend, not too slow to bore.
-                </p>
-              </div>
+            <CardContent>
+              <AIChatbot />
             </CardContent>
-            <CardFooter className="bg-navy-50 dark:bg-navy-900 rounded-b-lg">
-              <div className="text-xs text-navy-700 dark:text-navy-300 space-y-2">
-                <p className="font-medium">Pro Tip:</p>
-                <p>Record yourself practicing the same speech multiple times to track your improvement over repetitions.</p>
-              </div>
-            </CardFooter>
           </Card>
         </div>
       </div>
